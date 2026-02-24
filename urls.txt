@@ -1,0 +1,37 @@
+# urls.txt — List of URLs to scrape for training data
+
+# One URL per line. Lines starting with # are ignored.
+
+# 
+
+# Usage:
+
+# python data_pipeline.py –source web –urls urls.txt –output data.bin
+
+# 
+
+# Tips:
+
+# - Use Wikipedia article URLs for general knowledge
+
+# - Use domain-specific sites for specialized models
+
+# - Avoid sites with paywalls or heavy JavaScript rendering
+
+# - Always respect a site’s robots.txt and terms of service
+
+# — Example: Wikipedia articles —
+
+# https://en.wikipedia.org/wiki/Artificial_intelligence
+
+# https://en.wikipedia.org/wiki/Machine_learning
+
+# https://en.wikipedia.org/wiki/Deep_learning
+
+# — Example: News / blogs —
+
+# https://techcrunch.com/category/artificial-intelligence/
+
+# https://www.technologyreview.com/
+
+# Add your URLs below:
