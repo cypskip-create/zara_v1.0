@@ -1,0 +1,9 @@
+checkpoints/
+processed/
+raw_data/
+__pycache__/
+*.pt
+*.bin
+*.pyc
+.DS_Store
+*.egg-info/
