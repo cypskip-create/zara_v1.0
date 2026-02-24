@@ -88,7 +88,7 @@ return parser.parse_args()
 # —————————————————————————
 
 def load_text_data(path: str, val_frac: float):
-“”“Load and tokenize a raw text file.”””
+”“Load and tokenize a raw text file.”””
 try:
 import tiktoken
 except ImportError:
