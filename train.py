@@ -200,6 +200,8 @@ return text
 
 def main():
 args = parse_args()
+
+os.makedirs(args.out_dir, exist_ok=True)
 torch.manual_seed(args.seed)
 
 ```
