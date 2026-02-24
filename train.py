@@ -132,7 +132,7 @@ return train, val, vocab_size, enc
 ```
 
 def get_batch(data: torch.Tensor, batch_size: int, context_len: int, device: str):
-“”“Sample a random batch.”””
+""“Sample a random batch.”""
 ix = torch.randint(len(data) - context_len, (batch_size,))
 x = torch.stack([data[i : i + context_len] for i in ix])
 y = torch.stack([data[i + 1 : i + context_len + 1] for i in ix])
