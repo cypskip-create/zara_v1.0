@@ -1,5 +1,5 @@
 ## “””
-AfriCode LM — African Code Assistant Language Model
+AfriCode LM - African Code Assistant Language Model
 
 A GPT-style decoder-only transformer optimized for:
 
@@ -108,7 +108,7 @@ def forward(self, x):
 ```
 
 class TransformerBlock(nn.Module):
-“”“Pre-norm transformer block: LN → Attn → residual, LN → FFN → residual.”””
+“”“Pre-norm transformer block: LN -> Attn -> residual, LN -> FFN -> residual.”””
 
 ```
 def __init__(self, cfg: ModelConfig):
@@ -132,7 +132,7 @@ def forward(self, x):
 
 class TransformerLM(nn.Module):
 “””
-AfriCode LM — GPT-style causal language model.
+AfriCode LM - GPT-style causal language model.
 Trained to assist African developers with local API integrations,
 mobile money, USSD apps, and African fintech solutions.
 “””
@@ -149,7 +149,7 @@ def __init__(self, cfg: ModelConfig):
     self.ln_f    = nn.LayerNorm(cfg.d_model)
     self.lm_head = nn.Linear(cfg.d_model, cfg.vocab_size, bias=False)
 
-    # Weight tying — share token embedding and output projection weights
+    # Weight tying - share token embedding and output projection weights
     self.lm_head.weight = self.tok_emb.weight
 
     self._init_weights()
