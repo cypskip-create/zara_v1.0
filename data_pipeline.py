@@ -1,5 +1,5 @@
 ## “””
-data_pipeline.py AfriCode LM Data Pipeline
+data_pipeline.py - AfriCode LM Data Pipeline
 
 Collects, cleans, and prepares training data specifically for the
 African Code Assistant, including:
@@ -14,7 +14,7 @@ Usage:
 # African API docs + web scraping
 python data_pipeline.py –source web –urls africode_urls.txt –output africode
 
-```
+
 # HuggingFace coding dataset (recommended first step)
 python data_pipeline.py --source hf --dataset bigcode/the-stack-smol --output africode
 
@@ -23,7 +23,7 @@ python data_pipeline.py --source files --input_dir ./raw_data --output africode
 
 # Fine-tuning Q&A pairs
 python data_pipeline.py --source qa --input_dir ./qa_pairs --output africode_ft
-```
+
 
 Requirements:
 pip install tiktoken datasets requests beautifulsoup4 tqdm numpy
@@ -42,7 +42,7 @@ from typing import List, Iterator
 
 # —————————————————————————
 
-# African API & Tech URLs — Pre-loaded for AfriCode Training
+# African API & Tech URLs - Pre-loaded for AfriCode Training
 
 # —————————————————————————
 
@@ -51,7 +51,7 @@ AFRICODE_URLS = [
 “https://developer.safaricom.co.ke/APIs”,
 “https://developer.safaricom.co.ke/Documentation”,
 
-```
+
 # Paystack
 "https://paystack.com/docs/api/",
 "https://paystack.com/docs/payments/accept-payments/",
@@ -67,7 +67,7 @@ AFRICODE_URLS = [
 # African tech blogs
 "https://engineering.paystack.com",
 "https://medium.com/andela",
-```
+
 
 ]
 
@@ -82,11 +82,11 @@ parser = argparse.ArgumentParser(description=“AfriCode LM Data Pipeline”)
 parser.add_argument(”–source”,     type=str, required=True,
 choices=[“files”, “web”, “hf”, “qa”, “africode”],
 help=“Data source type:\n”
-“  files    — local .txt/.json files\n”
-“  web      — scrape URLs from a file\n”
-“  hf       — HuggingFace dataset\n”
-“  qa       — Q&A pairs for fine-tuning\n”
-“  africode — auto-scrape African API docs”)
+“  files    - local .txt/.json files\n”
+“  web      - scrape URLs from a file\n”
+“  hf       - HuggingFace dataset\n”
+“  qa       - Q&A pairs for fine-tuning\n”
+“  africode - auto-scrape African API docs”)
 parser.add_argument(”–input_dir”,      type=str, default=”./raw_data”)
 parser.add_argument(”–urls”,           type=str, default=“africode_urls.txt”)
 parser.add_argument(”–dataset”,        type=str, default=“bigcode/the-stack-smol”)
@@ -102,14 +102,14 @@ return parser.parse_args()
 
 # —————————————————————————
 
-# Text Cleaning — Code-Aware
+# Text Cleaning - Code-Aware
 
 # —————————————————————————
 
 class TextCleaner:
 “”“Cleans text while preserving code structure (indentation, syntax).”””
 
-```
+
 def __init__(self, min_length=50, max_length=50_000):
     self.min_length = min_length
     self.max_length = max_length
@@ -148,7 +148,7 @@ def process(self, text: str):
     if not self.is_valid(text):
         return None
     return self.truncate(text)
-```
+
 
 # —————————————————————————
 
@@ -157,17 +157,17 @@ def process(self, text: str):
 # —————————————————————————
 
 class Deduplicator:
-def **init**(self):
+def *init*(self):
 self.seen = set()
 
-```
+
 def is_duplicate(self, text: str) -> bool:
     h = hashlib.md5(text.encode("utf-8")).hexdigest()
     if h in self.seen:
         return True
     self.seen.add(h)
     return False
-```
+
 
 # —————————————————————————
 
@@ -178,7 +178,7 @@ def is_duplicate(self, text: str) -> bool:
 class FileSource:
 “”“Load code and text from local files.”””
 
-```
+
 EXTENSIONS = [".txt", ".md", ".py", ".js", ".php", ".java", ".json", ".ts", ".go"]
 
 def __init__(self, input_dir: str):
@@ -215,12 +215,12 @@ def iter_documents(self) -> Iterator[str]:
                     yield f.read()
         except Exception as e:
             print(f"  Warning: Could not read {filepath}: {e}")
-```
+
 
 class WebSource:
 “”“Scrape text/code from a list of URLs.”””
 
-```
+
 def __init__(self, urls_file: str):
     try:
         import requests
@@ -260,12 +260,12 @@ def iter_documents(self) -> Iterator[str]:
 
         except Exception as e:
             print(f"  Warning: Failed to scrape {url}: {e}")
-```
+
 
 class AfriCodeSource:
 “”“Auto-scrape the pre-defined list of African API documentation URLs.”””
 
-```
+
 def __init__(self):
     try:
         import requests
@@ -299,12 +299,12 @@ def iter_documents(self) -> Iterator[str]:
 
         except Exception as e:
             print(f"  Warning: {url}: {e}")
-```
+
 
 class HuggingFaceSource:
 “”“Load a HuggingFace dataset. Defaults to code datasets.”””
 
-```
+
 def __init__(self, dataset_name: str, config: str = None):
     try:
         from datasets import load_dataset
@@ -328,7 +328,7 @@ def iter_documents(self) -> Iterator[str]:
             if key in item and item[key]:
                 yield str(item[key])
                 break
-```
+
 
 class QASource:
 “””
@@ -340,7 +340,7 @@ Expects JSON files with format:
 ]
 “””
 
-```
+
 def __init__(self, input_dir: str):
     self.input_dir = Path(input_dir)
     self.files     = list(self.input_dir.rglob("*.json"))
@@ -365,18 +365,18 @@ def iter_documents(self) -> Iterator[str]:
                         yield doc
         except Exception as e:
             print(f"  Warning: {filepath}: {e}")
-```
+
 
 # —————————————————————————
 
-# Dataset Builder — Tokenize & Save as Binary
+# Dataset Builder - Tokenize & Save as Binary
 
 # —————————————————————————
 
 class DatasetBuilder:
 “”“Tokenize documents and save to binary files for fast training.”””
 
-```
+
 def __init__(self, output_dir: str, val_frac: float = 0.05):
     self.output_dir = Path(output_dir)
     self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -432,12 +432,12 @@ def build(self, documents: List[str], output_name: str = "africode"):
     print(f"  Documents  : {len(documents):,}")
     print(f"  Characters : {total_chars:,}")
     print(f"  Tokens     : {total_tokens:,}")
-    print(f"  Train      : {len(train_tokens):,} tokens → {train_path}")
-    print(f"  Val        : {len(val_tokens):,} tokens  → {val_path}")
+    print(f"  Train      : {len(train_tokens):,} tokens -> {train_path}")
+    print(f"  Val        : {len(val_tokens):,} tokens  -> {val_path}")
     print(f"{'='*55}\n")
 
     return str(train_path), str(val_path)
-```
+
 
 # —————————————————————————
 
@@ -452,7 +452,7 @@ total_chars = sum(lengths)
 total_words = sum(len(d.split()) for d in documents)
 token_est   = int(total_words * 1.3)
 
-```
+
 print(f"  Documents     : {len(documents):,}")
 print(f"  Total chars   : {total_chars:,}")
 print(f"  Avg doc length: {total_chars // max(len(documents), 1):,} chars")
@@ -460,16 +460,16 @@ print(f"  Est. tokens   : ~{token_est:,}")
 
 print(f"\n--- Training Readiness ---")
 if token_est < 1_000_000:
-    print(f"  ⚠️  Small ({token_est:,} tokens) — collect more data before serious training")
+    print(f"  !  Small ({token_est:,} tokens) - collect more data before serious training")
     print(f"  Tip: Add the-stack-smol Python dataset for instant volume boost")
 elif token_est < 10_000_000:
-    print(f"  ✓  Good ({token_est:,} tokens) — solid start for a 10–25M param model")
+    print(f"  v  Good ({token_est:,} tokens) - solid start for a 10-25M param model")
 elif token_est < 100_000_000:
-    print(f"  ✓✓ Large ({token_est:,} tokens) — ready for a serious 85M param model")
+    print(f"  vv Large ({token_est:,} tokens) - ready for a serious 85M param model")
 else:
-    print(f"  🚀 Excellent ({token_est:,} tokens) — you're playing in the big leagues!")
+    print(f"   Excellent ({token_est:,} tokens) - you're playing in the big leagues!")
 print()
-```
+
 
 # —————————————————————————
 
@@ -481,7 +481,7 @@ def main():
 args = parse_args()
 os.makedirs(args.output_dir, exist_ok=True)
 
-```
+
 cleaner = TextCleaner(min_length=args.min_length, max_length=args.max_length)
 deduper = Deduplicator()
 
@@ -534,9 +534,9 @@ if args.analyze:
 builder = DatasetBuilder(output_dir=args.output_dir, val_frac=args.val_frac)
 train_path, val_path = builder.build(documents, output_name=args.output)
 
-print(f"✓ Pipeline complete! Train your model with:")
+print(f"v Pipeline complete! Train your model with:")
 print(f"  python train.py --data_train {train_path} --data_val {val_path}")
-```
 
-if **name** == “**main**”:
+
+if *name* == “*main*”:
 main()
