@@ -79,7 +79,7 @@ https://developer.safaricom.co.ke/Documentation,
 
 def parse_args():
 parser = argparse.ArgumentParser(description=AfriCode LM Data Pipeline)
-parser.add_argument(–source,     type=str, required=True,
+parser.add_argument(source,     type=str, required=True,
 choices=[“files”, “web”, “hf”, “qa”, “africode”],
 help=“Data source type:\n”
 “  files    - local .txt/.json files\n”
