@@ -12,7 +12,7 @@ African Code Assistant, including:
 
 Usage:
 # African API docs + web scraping
-python data_pipeline.py source web –urls africode_urls.txt –output africode
+python data_pipeline.py source web urls africode_urls.txt –output africode
 
 
 # HuggingFace coding dataset (recommended first step)
