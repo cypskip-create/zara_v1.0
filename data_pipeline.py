@@ -27,7 +27,7 @@ python data_pipeline.py --source qa --input_dir ./qa_pairs --output africode_ft
 
 Requirements:
 pip install tiktoken datasets requests beautifulsoup4 tqdm numpy
-””
+
 
 import os
 import re
