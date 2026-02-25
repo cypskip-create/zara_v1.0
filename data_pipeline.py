@@ -1,5 +1,5 @@
 ## “””
-data_pipeline.py — AfriCode LM Data Pipeline
+data_pipeline.py AfriCode LM Data Pipeline
 
 Collects, cleans, and prepares training data specifically for the
 African Code Assistant, including:
