@@ -3,7 +3,7 @@
 # Real-time transaction and identity fraud detection
 
 from typing import Any, Dict, Optional
-from base_tool import BaseTool
+from .base_tool import BaseTool
 from datetime import datetime
 
 

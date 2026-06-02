@@ -1,7 +1,4 @@
-import os
-os.chdir('/content/zara_v1.0')
-
-code = '''import os
+﻿import os
 import math
 import time
 import argparse
@@ -9,12 +6,13 @@ import numpy as np
 import torch
 from model import ModelConfig, TransformerLM
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Train Zara by Nexara")
     parser.add_argument("--data", type=str, default=None)
     parser.add_argument("--data_train", type=str, default=None)
     parser.add_argument("--data_val", type=str, default=None)
-    parser.add_argument("--out_dir", type=str, default="/content/drive/MyDrive/Nexara/zara_checkpoints")
+    parser.add_argument("--out_dir", type=str, default="./checkpoints")
     parser.add_argument("--context_len", type=int, default=512)
     parser.add_argument("--d_model", type=int, default=512)
     parser.add_argument("--n_heads", type=int, default=8)
@@ -36,6 +34,7 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
 
+
 def load_text_data(path, val_frac):
     import tiktoken
     enc = tiktoken.get_encoding("gpt2")
@@ -48,6 +47,7 @@ def load_text_data(path, val_frac):
     split = int(len(tokens) * (1 - val_frac))
     return tokens[:split], tokens[split:], enc.n_vocab, enc
 
+
 def load_bin_data(train_path, val_path):
     import tiktoken
     train = torch.from_numpy(np.fromfile(train_path, dtype=np.uint16).astype(np.int64))
@@ -55,11 +55,13 @@ def load_bin_data(train_path, val_path):
     enc = tiktoken.get_encoding("gpt2")
     return train, val, enc.n_vocab, enc
 
+
 def get_batch(data, batch_size, context_len, device):
     ix = torch.randint(len(data) - context_len, (batch_size,))
-    x = torch.stack([data[i: i + context_len] for i in ix])
-    y = torch.stack([data[i + 1: i + context_len + 1] for i in ix])
+    x = torch.stack([data[i : i + context_len] for i in ix])
+    y = torch.stack([data[i + 1 : i + context_len + 1] for i in ix])
     return x.to(device), y.to(device)
+
 
 def get_lr(step, warmup_steps, max_steps, lr, min_lr):
     if step < warmup_steps:
@@ -69,6 +71,7 @@ def get_lr(step, warmup_steps, max_steps, lr, min_lr):
     progress = (step - warmup_steps) / max(max_steps - warmup_steps, 1)
     coeff = 0.5 * (1.0 + math.cos(math.pi * progress))
     return min_lr + coeff * (lr - min_lr)
+
 
 @torch.no_grad()
 def estimate_loss(model, train_data, val_data, batch_size, context_len, device, n_batches=20):
@@ -84,13 +87,15 @@ def estimate_loss(model, train_data, val_data, batch_size, context_len, device, 
     model.train()
     return results
 
+
 SAMPLE_PROMPTS = [
-    "A cybersecurity threat in Africa is\\n",
-    "To protect against SIM swap fraud\\n",
-    "The most common attack on African fintech\\n",
-    "Incident response steps after a breach\\n",
-    "African cybersecurity regulations require\\n",
+    "A cybersecurity threat in Africa is\n",
+    "To protect against SIM swap fraud\n",
+    "The most common attack on African fintech\n",
+    "Incident response steps after a breach\n",
+    "African cybersecurity regulations require\n",
 ]
+
 
 @torch.no_grad()
 def sample_code(model, enc, device, temperature=0.7, top_k=40, max_new_tokens=120):
@@ -100,9 +105,9 @@ def sample_code(model, enc, device, temperature=0.7, top_k=40, max_new_tokens=12
     tokens = enc.encode(prompt)
     idx = torch.tensor([tokens], dtype=torch.long, device=device)
     out = model.generate(idx, max_new_tokens=max_new_tokens, temperature=temperature, top_k=top_k)
-    text = enc.decode(out[0].tolist())
     model.train()
-    return text
+    return enc.decode(out[0].tolist())
+
 
 def save_checkpoint(model, optimizer, cfg, step, out_dir):
     path = os.path.join(out_dir, "ckpt_step" + str(step) + ".pt")
@@ -115,16 +120,18 @@ def save_checkpoint(model, optimizer, cfg, step, out_dir):
     print("Checkpoint saved -> " + path)
     return path
 
+
 def cleanup_old_checkpoints(out_dir, keep_last=2):
     import glob
     checkpoints = sorted(
         glob.glob(os.path.join(out_dir, "ckpt_step*.pt")),
-        key=lambda x: int(x.split("step")[-1].replace(".pt", ""))
+        key=lambda x: int(x.split("step")[-1].replace(".pt", "")),
     )
     to_delete = checkpoints[:-keep_last]
     for f in to_delete:
         os.remove(f)
         print("Deleted old checkpoint: " + os.path.basename(f))
+
 
 def main():
     args = parse_args()
@@ -190,7 +197,7 @@ def main():
     t0 = time.time()
 
     print("Training Zara cybersecurity brain from step " + str(start_step) + " to " + str(args.max_steps))
-    print("Saving every " + str(args.save_every) + " steps to Google Drive")
+    print("Saving every " + str(args.save_every) + " steps")
     print("-" * 60)
 
     for step in range(start_step, args.max_steps):
@@ -240,7 +247,7 @@ def main():
 
         if step > 0 and step % args.sample_every == 0:
             sample = sample_code(model, enc, device)
-            print("\\n--- Zara Cybersecurity Sample at step " + str(step) + " ---")
+            print("\n--- Zara Cybersecurity Sample at step " + str(step) + " ---")
             print(sample)
             print("-" * 60)
 
@@ -258,15 +265,6 @@ def main():
     print("Training complete!")
     print("Zara cybersecurity brain saved -> " + final_path)
 
+
 if __name__ == "__main__":
     main()
-'''
-
-with open("train.py", "w") as f:
-    f.write(code)
-
-import ast
-with open("train.py", "r") as f:
-    content = f.read()
-ast.parse(content)
-print("train.py clean and valid!")

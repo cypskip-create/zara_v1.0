@@ -1,10 +1,8 @@
-import os
-os.chdir('/content/zara_v1.0')
-
-code = '''import math
+﻿import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 
 class ModelConfig:
     def __init__(self, vocab_size=50257, context_length=512,
@@ -19,6 +17,7 @@ class ModelConfig:
         self.d_ff = d_ff
         self.dropout = dropout
         self.bias = bias
+
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, cfg):
@@ -35,8 +34,10 @@ class MultiHeadAttention(nn.Module):
     def forward(self, x):
         B, T, C = x.shape
         q, k, v = self.qkv(x).split(C, dim=-1)
-        def reshape(t):
-            return t.view(B, T, self.n_heads, self.d_head).transpose(1, 2)
+
+        def reshape(tensor):
+            return tensor.view(B, T, self.n_heads, self.d_head).transpose(1, 2)
+
         q, k, v = reshape(q), reshape(k), reshape(v)
         scale = math.sqrt(self.d_head)
         attn = (q @ k.transpose(-2, -1)) / scale
@@ -47,6 +48,7 @@ class MultiHeadAttention(nn.Module):
         out = out.transpose(1, 2).contiguous().view(B, T, C)
         return self.resid_drop(self.out_proj(out))
 
+
 class FeedForward(nn.Module):
     def __init__(self, cfg):
         super().__init__()
@@ -56,8 +58,10 @@ class FeedForward(nn.Module):
             nn.Linear(cfg.d_ff, cfg.d_model, bias=cfg.bias),
             nn.Dropout(cfg.dropout),
         )
+
     def forward(self, x):
         return self.net(x)
+
 
 class TransformerBlock(nn.Module):
     def __init__(self, cfg):
@@ -66,10 +70,12 @@ class TransformerBlock(nn.Module):
         self.attn = MultiHeadAttention(cfg)
         self.ln2 = nn.LayerNorm(cfg.d_model)
         self.ff = FeedForward(cfg)
+
     def forward(self, x):
         x = x + self.attn(self.ln1(x))
         x = x + self.ff(self.ln2(x))
         return x
+
 
 class TransformerLM(nn.Module):
     def __init__(self, cfg):
@@ -121,18 +127,7 @@ class TransformerLM(nn.Module):
         return idx
 
     def num_parameters(self, trainable_only=True):
+        params = self.parameters()
         if trainable_only:
             params = filter(lambda p: p.requires_grad, self.parameters())
-        else:
-            params = self.parameters()
         return sum(p.numel() for p in params)
-'''
-
-with open("model.py", "w") as f:
-    f.write(code)
-
-import ast
-with open("model.py", "r") as f:
-    content = f.read()
-ast.parse(content)
-print("model.py clean and valid!")

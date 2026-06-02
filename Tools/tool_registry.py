@@ -33,12 +33,12 @@ class ToolRegistry:
 
     def _register_all_tools(self):
         """Register all available tools. Add new tools here."""
-        from threat_detector import ThreatDetector
-        from fraud_detector import FraudDetector
-        from security_auditor import SecurityAuditor
-        from incident_responder import IncidentResponder
-        from compliance_checker import ComplianceChecker
-        from vulnerability_scanner import VulnerabilityScanner
+        from .threat_detector import ThreatDetector
+        from .fraud_detector import FraudDetector
+        from .security_auditor import SecurityAuditor
+        from .incident_responder import IncidentResponder
+        from .compliance_checker import ComplianceChecker
+        from .vulnerability_scanner import VulnerabilityScanner
 
         tools = [
             ThreatDetector(),

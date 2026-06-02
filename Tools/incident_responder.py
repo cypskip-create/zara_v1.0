@@ -4,7 +4,7 @@
 # specific to African legal and regulatory requirements
 
 from typing import Any, Dict, List
-from base_tool import BaseTool
+from .base_tool import BaseTool
 
 
 PLAYBOOKS = {

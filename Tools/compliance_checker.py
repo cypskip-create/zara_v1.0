@@ -3,7 +3,7 @@
 # African cybersecurity and data protection compliance
 
 from typing import Any, Dict, List
-from base_tool import BaseTool
+from .base_tool import BaseTool
 
 
 COMPLIANCE_FRAMEWORKS = {
