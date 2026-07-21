@@ -1,5 +1,5 @@
 # tools/base_tool.py
-# Zara by Nexara - Base Tool Class
+# Zara - Base Tool Class
 # Every tool Zara uses inherits from this
 
 from abc import ABC, abstractmethod

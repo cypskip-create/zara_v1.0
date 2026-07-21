@@ -1,5 +1,5 @@
 # tools/compliance_checker.py
-# Zara by Nexara - Compliance Checker Tool
+# Zara - Compliance Checker Tool
 # African cybersecurity and data protection compliance
 
 from typing import Any, Dict, List
@@ -203,6 +203,70 @@ COMPLIANCE_FRAMEWORKS = {
         ],
         "penalties": "CBK sanctions including fines and license revocation",
     },
+    "ghana_dpa": {
+        "name": "Ghana Data Protection Act 2012 (Act 843)",
+        "country": "Ghana",
+        "authority": "Data Protection Commission (Ghana)",
+        "requirements": [
+            {
+                "id": "GH-DPA-1",
+                "requirement": "Data Controller Registration",
+                "description": "Register as a data controller with the Data Protection Commission",
+                "mandatory": True,
+            },
+            {
+                "id": "GH-DPA-2",
+                "requirement": "Lawful Basis for Processing",
+                "description": "Establish and document lawful basis for all personal data processing",
+                "mandatory": True,
+            },
+            {
+                "id": "GH-DPA-3",
+                "requirement": "Data Subject Rights",
+                "description": "Implement mechanisms for data subjects to access, correct, and object to processing of their data",
+                "mandatory": True,
+            },
+            {
+                "id": "GH-DPA-4",
+                "requirement": "Security Safeguards",
+                "description": "Implement appropriate technical and organizational measures to protect personal data",
+                "mandatory": True,
+            },
+            {
+                "id": "GH-DPA-5",
+                "requirement": "Cross-border Transfer Controls",
+                "description": "Ensure adequate protection for personal data transferred outside Ghana",
+                "mandatory": True,
+            },
+        ],
+        "penalties": "Fines and/or imprisonment as prescribed under Act 843; Commission may also issue enforcement notices.",
+    },
+    "bog_cybersecurity": {
+        "name": "Bank of Ghana Cyber and Information Security Directive",
+        "country": "Ghana",
+        "authority": "Bank of Ghana",
+        "requirements": [
+            {
+                "id": "BOG-1",
+                "requirement": "Cybersecurity Policy",
+                "description": "Board-approved cybersecurity policy reviewed annually",
+                "mandatory": True,
+            },
+            {
+                "id": "BOG-2",
+                "requirement": "Incident Reporting",
+                "description": "Report significant cyber incidents to Bank of Ghana within 24 hours",
+                "mandatory": True,
+            },
+            {
+                "id": "BOG-3",
+                "requirement": "Third Party Risk Management",
+                "description": "Assess and monitor cybersecurity risks from third party vendors and fintech partners",
+                "mandatory": True,
+            },
+        ],
+        "penalties": "Regulatory sanctions and fines as determined by Bank of Ghana. License action for serious violations.",
+    },
 }
 
 
@@ -254,15 +318,18 @@ class ComplianceChecker(BaseTool):
             "nigeria": ["nigeria_ndpr"],
             "kenya": ["kenya_dpa"],
             "south africa": ["south_africa_popia"],
+            "ghana": ["ghana_dpa"],
         }
 
-        frameworks = framework_map.get(country.lower(), [])
+        frameworks = list(framework_map.get(country.lower(), []))
 
         if "fintech" in org_type.lower() or "bank" in org_type.lower():
             if "nigeria" in country.lower():
                 frameworks.append("cbn_cybersecurity")
             elif "kenya" in country.lower():
                 frameworks.append("cbk_cybersecurity")
+            elif "ghana" in country.lower():
+                frameworks.append("bog_cybersecurity")
 
         return frameworks
 

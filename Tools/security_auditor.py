@@ -1,5 +1,5 @@
 # tools/security_auditor.py
-# Zara by Nexara - Security Auditor Tool
+# Zara - Security Auditor Tool
 # Scans code and configurations for security vulnerabilities
 
 from typing import Any, Dict, List
@@ -151,16 +151,22 @@ class SecurityAuditor(BaseTool):
             }
 
         vulnerabilities = []
-        lines = code.split("\n")
 
         for vuln in VULNERABILITY_PATTERNS:
             matches = []
-            for line_num, line in enumerate(lines, 1):
-                if re.search(vuln["pattern"], line, re.IGNORECASE):
-                    matches.append({
-                        "line_number": line_num,
-                        "line_content": line.strip(),
-                    })
+            # Search the FULL text (not line-by-line) so patterns that span a
+            # newline, like SEC-013's "@app.route(...)\ndef ..." check, can
+            # actually match. Line-by-line search against a pattern containing
+            # a literal "\n" can never succeed, since a single split line never
+            # contains a newline character -- that was silently disabling
+            # SEC-013 (No Rate Limiting) entirely.
+            for m in re.finditer(vuln["pattern"], code, re.IGNORECASE):
+                line_number = code.count("\n", 0, m.start()) + 1
+                line_content = code.splitlines()[line_number - 1].strip() if line_number - 1 < len(code.splitlines()) else m.group(0).strip()
+                matches.append({
+                    "line_number": line_number,
+                    "line_content": line_content,
+                })
 
             if matches:
                 vulnerabilities.append({
@@ -182,7 +188,7 @@ class SecurityAuditor(BaseTool):
         high_count = len([v for v in vulnerabilities if v["severity"] == "HIGH"])
         medium_count = len([v for v in vulnerabilities if v["severity"] == "MEDIUM"])
 
-        security_score = self._calculate_score(vulnerabilities, len(lines))
+        security_score = self._calculate_score(vulnerabilities, code.count("\n") + 1)
 
         return {
             "success": True,
@@ -193,7 +199,7 @@ class SecurityAuditor(BaseTool):
             "high_count": high_count,
             "medium_count": medium_count,
             "vulnerabilities": vulnerabilities,
-            "lines_scanned": len(lines),
+            "lines_scanned": code.count("\n") + 1,
             "summary": self._generate_summary(vulnerabilities, security_score),
             "pass_security_check": critical_count == 0 and high_count == 0,
         }

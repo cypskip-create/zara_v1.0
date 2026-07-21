@@ -1,5 +1,5 @@
 # tools/threat_detector.py
-# Zara by Nexara - Threat Detector Tool
+# Zara - Threat Detector Tool
 # Analyzes text, logs, or events for cybersecurity threats
 
 from typing import Any, Dict, List

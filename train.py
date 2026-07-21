@@ -32,7 +32,22 @@ def parse_args():
     parser.add_argument("--sample_every", type=int, default=500)
     parser.add_argument("--resume", type=str, default=None)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--run_name", type=str, default=None,
+                        help="Name used for the final checkpoint, e.g. 'r5'. If not set, defaults to "
+                             "'zara_step<N>' using the actual final step number, which avoids every "
+                             "training round silently overwriting the same 'zara_cybersecurity_v1.pt' "
+                             "file regardless of which round actually produced it.")
     return parser.parse_args()
+
+
+def _require_file(path, flag_name):
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            "Could not find " + flag_name + "=" + path + " (looked relative to cwd=" + os.getcwd() + "). "
+            "If you just re-ran build_r5_dataset.py or the data pipeline in a fresh Colab session, make sure "
+            "that cell actually completed (check for its 'Done.' / 'Dataset ready!' print line) before "
+            "running train.py -- a partial or skipped build step is the most common cause of this error."
+        )
 
 
 def load_text_data(path, val_frac):
@@ -104,7 +119,8 @@ def sample_code(model, enc, device, temperature=0.7, top_k=40, max_new_tokens=12
     model.eval()
     tokens = enc.encode(prompt)
     idx = torch.tensor([tokens], dtype=torch.long, device=device)
-    out = model.generate(idx, max_new_tokens=max_new_tokens, temperature=temperature, top_k=top_k)
+    out = model.generate(idx, max_new_tokens=max_new_tokens, temperature=temperature, top_k=top_k,
+                          eos_token_id=getattr(enc, "eot_token", None))
     model.train()
     return enc.decode(out[0].tolist())
 
@@ -152,8 +168,11 @@ def main():
     if args.data_train is not None:
         if args.data_val is None:
             raise ValueError("data_val required")
+        _require_file(args.data_train, "--data_train")
+        _require_file(args.data_val, "--data_val")
         train_data, val_data, vocab_size, enc = load_bin_data(args.data_train, args.data_val)
     elif args.data is not None:
+        _require_file(args.data, "--data")
         train_data, val_data, vocab_size, enc = load_text_data(args.data, args.val_frac)
     else:
         raise ValueError("Provide --data or --data_train and --data_val")
@@ -190,6 +209,14 @@ def main():
         optimizer.load_state_dict(ckpt["optimizer"])
         start_step = ckpt["step"]
         print("Resumed from step " + str(start_step))
+
+    if start_step >= args.max_steps:
+        print(
+            "WARNING: resumed step (" + str(start_step) + ") is already >= --max_steps (" +
+            str(args.max_steps) + "). No training will happen this run and no checkpoint will be "
+            "rewritten. Increase --max_steps if you intended to continue training further."
+        )
+        return
 
     model.train()
     best_val_loss = float("inf")
@@ -255,13 +282,15 @@ def main():
             save_checkpoint(model, optimizer, cfg, step, args.out_dir)
             cleanup_old_checkpoints(args.out_dir, keep_last=2)
 
-    final_path = os.path.join(args.out_dir, "zara_cybersecurity_v1.pt")
+    final_name = args.run_name if args.run_name else ("zara_step" + str(args.max_steps))
+    final_path = os.path.join(args.out_dir, final_name + ".pt")
     torch.save({
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
         "cfg": cfg.__dict__,
         "step": args.max_steps,
     }, final_path)
+    cleanup_old_checkpoints(args.out_dir, keep_last=2)
     print("Training complete!")
     print("Zara cybersecurity brain saved -> " + final_path)
 

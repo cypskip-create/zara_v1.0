@@ -1,5 +1,5 @@
 # tools/incident_responder.py
-# Zara by Nexara - Incident Responder Tool
+# Zara - Incident Responder Tool
 # Generates step-by-step incident response playbooks
 # specific to African legal and regulatory requirements
 
@@ -201,7 +201,11 @@ class IncidentResponder(BaseTool):
 
         playbook = PLAYBOOKS[incident_type]
         regulatory = playbook.get("regulatory_reporting", {})
-        country_reporting = regulatory.get(country, "Check with your national CERT and relevant financial regulator for specific reporting requirements in your country.")
+        regulatory_ci = {k.lower(): v for k, v in regulatory.items()}
+        country_reporting = regulatory_ci.get(
+            country.lower(),
+            "Check with your national CERT and relevant financial regulator for specific reporting requirements in your country.",
+        )
 
         return {
             "success": True,

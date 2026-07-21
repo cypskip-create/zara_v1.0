@@ -1,5 +1,5 @@
 # tools/tool_registry.py
-# Zara by Nexara - Tool Registry
+# Zara - Tool Registry
 # Central registry where Zara discovers and accesses all tools
 # This is how Zara knows what tools exist and when to use them
 
@@ -128,9 +128,10 @@ class ToolRegistry:
             {
                 "tool": "incident_responder",
                 "keywords": [
-                    "incident", "response", "what do i do", "help",
+                    "incident", "response plan", "what do i do", "playbook",
                     "under attack", "been hacked", "ransomware hit",
                     "data breach happened", "what steps", "how to respond",
+                    "we got hacked", "we have been breached",
                 ],
             },
             {

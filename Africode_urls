@@ -1,47 +1,53 @@
-# africode_urls.txt — African API Documentation URLs
-
+# africode_urls.txt — Source URLs for Zara's --source web pipeline
 # =====================================================
-
-# These URLs are scraped to train AfriCode LM on African
-
-# API integrations, mobile money, and fintech solutions.
-
-# 
-
+# These URLs are scraped by data_pipeline.py (--source web) to gather
+# African fintech API documentation and cybersecurity/compliance reference
+# material.
+#
+# NOTE ON FILENAME: this file MUST be named exactly "africode_urls.txt" to
+# match data_pipeline.py's default --urls argument. An earlier version of
+# this file was committed as "Africode_urls" (different case, no .txt
+# extension), which meant `python data_pipeline.py --source web` without an
+# explicit --urls flag would silently look for a file that didn't exist.
+#
 # Usage:
-
-# python data_pipeline.py –source web –urls africode_urls.txt –output africode_apis
-
-# 
-
+#   python data_pipeline.py --source web --urls africode_urls.txt --output zara_web
+#
 # Add more URLs below as you discover good sources.
-
 # Lines starting with # are ignored.
 
-# — M-Pesa / Safaricom (Kenya) —
-
+# --- African mobile money / payment API docs ---
 https://developer.safaricom.co.ke/APIs
 https://developer.safaricom.co.ke/Documentation
-
-# — Paystack (Nigeria, Ghana, South Africa) —
-
 https://paystack.com/docs/api/
 https://paystack.com/docs/payments/accept-payments/
 https://paystack.com/docs/libraries-and-plugins/
 https://paystack.com/docs/payments/verify-payments/
-
-# — Flutterwave (Pan-Africa) —
-
 https://developer.flutterwave.com/docs
 https://developer.flutterwave.com/reference
-
-# — MTN Mobile Money —
-
 https://momodeveloper.mtn.com/docs
 
-# — African Tech Blogs —
-
+# --- African tech / engineering blogs ---
 https://engineering.paystack.com
 https://medium.com/andela
 
-# — Add your own URLs below —
+# --- National CERTs / CSIRTs (incident advisories, cybersecurity guidance) ---
+https://www.ngcert.gov.ng
+https://www.kecirt.go.ke
+https://www.csirt.gov.za
+
+# --- Regulators referenced by Tools/compliance_checker.py ---
+https://ndpc.gov.ng
+https://www.odpc.go.ke
+https://inforegulator.org.za
+https://www.dataprotection.org.gh
+https://www.cbn.gov.ng
+https://www.centralbank.go.ke
+https://www.bog.gov.gh
+
+# --- General security reference (not Africa-specific, but used by
+#     Tools/security_auditor.py and Tools/vulnerability_scanner.py patterns) ---
+https://owasp.org/www-project-top-ten/
+https://attack.mitre.org
+
+# --- Add your own URLs below ---

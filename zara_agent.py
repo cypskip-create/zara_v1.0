@@ -1,5 +1,5 @@
 # zara_agent.py
-# Zara by Nexara - The Brain
+# Zara - The Brain
 # Connects Zara's language model to her tools
 # This is where the model and tools become one system
 
@@ -71,17 +71,55 @@ class ZaraAgent:
             print("Running in tool-only mode.")
 
     def _generate(self, prompt: str, max_tokens: int = 200, temperature: float = 0.7) -> str:
-        """Generate text using Zara's language model."""
+        """
+        Generate text using Zara's language model, formatted to match the
+        '### Question:\n...\n\n### Answer:\n...' structure used during training.
+        Returns ONLY the answer portion, truncated at the first sign the model
+        has started hallucinating a new turn (a fresh '### Question:' block),
+        and stopped early on the EOS token rather than always running the full
+        max_tokens length.
+        """
         if self.model is None or self.enc is None:
             return ""
         try:
-            tokens = self.enc.encode(prompt)
-            idx = torch.tensor([tokens[-512:]], dtype=torch.long, device=self.device)
+            formatted = "### Question:\n" + prompt.strip() + "\n\n### Answer:\n"
+            tokens = self.enc.encode(formatted, allowed_special={"<|endoftext|>"})
+            idx = torch.tensor([tokens[-self.model.cfg.context_length:]], dtype=torch.long, device=self.device)
             with torch.no_grad():
-                out = self.model.generate(idx, max_new_tokens=max_tokens, temperature=temperature, top_k=40)
-            return self.enc.decode(out[0].tolist())
+                out = self.model.generate(
+                    idx, max_new_tokens=max_tokens, temperature=temperature, top_k=40,
+                    eos_token_id=getattr(self.enc, "eot_token", None),
+                )
+            full_text = self.enc.decode(out[0].tolist())
+            answer = full_text[len(formatted):]
+            # Stop at the first sign the model started a new Q/A turn or hit EOS text.
+            for stop_marker in ["### Question:", "<|endoftext|>"]:
+                if stop_marker in answer:
+                    answer = answer.split(stop_marker)[0]
+            return answer.strip()
         except Exception as e:
+            print("Generation failed: " + str(e))
             return ""
+
+    def _is_degenerate(self, text: str) -> bool:
+        """
+        Heuristic check for outputs that are too short, empty, or clearly
+        off-topic (e.g. leftover WikiText-style content) to be worth showing
+        instead of a canned fallback response. This matters because a small,
+        still-imperfectly-trained model can occasionally produce ramble that
+        is strictly worse than admitting a direct answer isn't available.
+        """
+        if not text or len(text) < 15:
+            return True
+        # Repetition collapse (a common small-model failure mode) -- if a
+        # single short phrase makes up a large fraction of the output, treat
+        # it as degenerate rather than showing an obviously broken loop.
+        words = text.split()
+        if len(words) >= 8:
+            most_common = max(set(words), key=words.count)
+            if words.count(most_common) / len(words) > 0.35:
+                return True
+        return False
 
     def _format_tool_result(self, tool_name: str, result: Dict, user_question: str) -> str:
         """Format tool results into a readable response."""
@@ -200,7 +238,11 @@ class ZaraAgent:
         """
         Main chat interface.
         User talks to Zara naturally.
-        Zara decides which tool to use and responds.
+        Zara decides which tool to use and responds. If no tool matches and
+        a trained model checkpoint is loaded, Zara's language model is asked
+        directly; if the model isn't loaded, or produces a degenerate result,
+        a curated fallback response is used instead so the user is never
+        shown obviously broken output.
         """
         self.conversation_history.append({"role": "user", "content": user_input})
 
@@ -217,7 +259,11 @@ class ZaraAgent:
                 if "required_fields" in tool_result or "example" in tool_result:
                     response += "\n\nTo use this tool, provide: " + str(tool_result.get("required_fields", []))
         else:
-            response = self._general_cybersecurity_response(user_input)
+            model_response = self._generate(user_input) if self.model is not None else ""
+            if model_response and not self._is_degenerate(model_response):
+                response = model_response
+            else:
+                response = self._general_cybersecurity_response(user_input)
 
         self.conversation_history.append({"role": "zara", "content": response})
         return response

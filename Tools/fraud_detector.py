@@ -1,5 +1,5 @@
 # tools/fraud_detector.py
-# Zara by Nexara - Fraud Detector Tool
+# Zara - Fraud Detector Tool
 # Real-time transaction and identity fraud detection
 
 from typing import Any, Dict, Optional

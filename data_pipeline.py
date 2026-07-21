@@ -2,6 +2,7 @@
 import re
 import sys
 import json
+import random
 import hashlib
 import argparse
 import numpy as np
@@ -32,6 +33,25 @@ def parse_args():
     parser.add_argument("--max_length", type=int, default=50000)
     parser.add_argument("--val_frac", type=float, default=0.05)
     parser.add_argument("--analyze", action="store_true")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Shuffle seed. Documents are always shuffled before tokenizing -- this is what "
+                             "prevents a model from seeing long unbroken topic-contiguous runs of a single "
+                             "source, which is a real cause of memorization/looping in small models.")
+    parser.add_argument("--repeat", type=int, default=1,
+                        help="Repeat the collected document set this many times before shuffling. Useful when "
+                             "--source is a small, high-value corpus (e.g. a hand-written QA set) that would "
+                             "otherwise be statistically invisible if later mixed with a much larger corpus.")
+    parser.add_argument("--mix_spec", type=str, default=None,
+                        help="Path to a JSON file describing a MULTI-SOURCE, TOKEN-BUDGETED mix, e.g.:\n"
+                             '[{"source": "qa", "input_dir": "./qa_data", "repeat": 4, "token_ratio": 0.5},\n'
+                             ' {"source": "qa", "input_dir": "./smalltalk_data", "repeat": 8, "token_ratio": 0.1},\n'
+                             ' {"source": "hf", "dataset": "wikitext", "dataset_config": "wikitext-103-raw-v1", '
+                             '"token_ratio": 0.4, "doc_pool": 20000}]\n'
+                             "token_ratio values should sum to ~1.0 and control TOKEN counts, not document "
+                             "counts -- this is deliberate, since a fixed document count silently lets a "
+                             "long-form source (like WikiText) drown out a short-form one (like QA pairs) even "
+                             "at document counts that look reasonable. When --mix_spec is set, --source is "
+                             "ignored and this drives collection instead.")
     return parser.parse_args()
 
 
@@ -181,7 +201,7 @@ class AfriCodeSource:
 
 
 class HuggingFaceSource:
-    def __init__(self, dataset_name, config=None):
+    def __init__(self, dataset_name, config=None, max_docs=None):
         try:
             from datasets import load_dataset
         except ImportError:
@@ -190,15 +210,20 @@ class HuggingFaceSource:
         print("Loading dataset: " + dataset_name + " config: " + str(config))
         self.dataset = load_dataset(dataset_name, config, trust_remote_code=True)
         self.dataset_name = dataset_name
+        self.max_docs = max_docs
 
     def iter_documents(self):
         split = "train" if "train" in self.dataset else list(self.dataset.keys())[0]
         data = self.dataset[split]
         text_keys = ["content", "text", "code", "body", "document"]
+        count = 0
         for item in tqdm(data, desc="Loading " + self.dataset_name):
+            if self.max_docs is not None and count >= self.max_docs:
+                break
             for key in text_keys:
                 if key in item and item[key]:
                     yield str(item[key])
+                    count += 1
                     break
 
 
@@ -281,6 +306,122 @@ class DatasetBuilder:
         return str(train_path), str(val_path)
 
 
+def build_source(source_type, **kwargs):
+    if source_type == "files":
+        return FileSource(kwargs.get("input_dir", "./raw_data"))
+    elif source_type == "web":
+        return WebSource(kwargs.get("urls", "africode_urls.txt"))
+    elif source_type == "hf":
+        return HuggingFaceSource(
+            kwargs.get("dataset", "bigcode/the-stack-smol"),
+            kwargs.get("dataset_config"),
+            max_docs=kwargs.get("doc_pool"),
+        )
+    elif source_type == "qa":
+        return QASource(kwargs.get("input_dir", "./raw_data"))
+    elif source_type == "africode":
+        return AfriCodeSource()
+    else:
+        raise ValueError("Unsupported source: " + source_type)
+
+
+def collect_documents(source, cleaner, deduper):
+    """Stream, clean, and dedup documents from a source. Returns (documents, stats)."""
+    documents = []
+    stats = {"total": 0, "low_quality": 0, "duplicate": 0, "accepted": 0}
+    for raw_doc in source.iter_documents():
+        stats["total"] += 1
+        cleaned = cleaner.process(raw_doc)
+        if cleaned is None:
+            stats["low_quality"] += 1
+            continue
+        if deduper.is_duplicate(cleaned):
+            stats["duplicate"] += 1
+            continue
+        documents.append(cleaned)
+        stats["accepted"] += 1
+    return documents, stats
+
+
+def build_mix(mix_spec_path, cleaner):
+    """
+    Token-budgeted multi-source mixing. See --mix_spec help text for the
+    expected JSON shape. Each spec entry is either:
+      - "repeat": N       -> deterministic, fully included, repeated N times
+      - "token_ratio": R  -> trimmed (at the document level, after shuffling
+                              that source's own document pool) to hit a token
+                              budget computed relative to the repeat-based
+                              sources' total token count.
+    Shuffling happens at the very end, across the ENTIRE combined document
+    list, which is what actually breaks up topic-contiguous blocks and is
+    the main lever against memorization/looping in a small model.
+    """
+    try:
+        import tiktoken
+    except ImportError:
+        raise ImportError("Run: pip install tiktoken")
+    enc = tiktoken.get_encoding("gpt2")
+
+    with open(mix_spec_path, "r", encoding="utf-8") as f:
+        specs = json.load(f)
+
+    fixed_docs = []
+    fixed_tokens = 0
+    ratio_groups = []  # (spec, documents) pairs pending token-budget trim
+
+    for spec in specs:
+        deduper = Deduplicator()
+        source = build_source(spec["source"], **spec)
+        docs, stats = collect_documents(source, cleaner, deduper)
+        print("[" + spec["source"] + "] total=" + str(stats["total"]) +
+              " accepted=" + str(stats["accepted"]) +
+              " duplicate=" + str(stats["duplicate"]) +
+              " low_quality=" + str(stats["low_quality"]))
+
+        if "repeat" in spec:
+            repeated = docs * int(spec["repeat"])
+            fixed_docs.extend(repeated)
+            for d in repeated:
+                fixed_tokens += len(enc.encode(d, allowed_special={"<|endoftext|>"})) + 1
+        elif "token_ratio" in spec:
+            random.shuffle(docs)  # sample varied documents, not just source order
+            ratio_groups.append((spec, docs))
+        else:
+            # No mixing directive given -> treat as fully included, like "repeat": 1
+            fixed_docs.extend(docs)
+            for d in docs:
+                fixed_tokens += len(enc.encode(d, allowed_special={"<|endoftext|>"})) + 1
+
+    print("Fixed (repeat-based) token total: " + str(fixed_tokens))
+
+    ratio_sum = sum(spec.get("token_ratio", 0) for spec, _ in ratio_groups)
+    all_docs = list(fixed_docs)
+    if ratio_groups and ratio_sum > 0:
+        # grand_total * (1 - ratio_sum) = fixed_tokens  =>  grand_total = fixed_tokens / (1 - ratio_sum)
+        denom = max(1e-6, (1 - ratio_sum)) if ratio_sum < 1 else 1e-6
+        grand_total = fixed_tokens / denom
+        for spec, docs in ratio_groups:
+            budget = int(grand_total * spec["token_ratio"])
+            used_tokens = 0
+            used_docs = []
+            for d in docs:
+                if used_tokens >= budget:
+                    break
+                toks = len(enc.encode(d, allowed_special={"<|endoftext|>"})) + 1
+                used_docs.append(d)
+                used_tokens += toks
+            print("[" + spec["source"] + "] token_ratio=" + str(spec["token_ratio"]) +
+                  " -> used " + str(len(used_docs)) + " docs / " + str(used_tokens) +
+                  " tokens (budget was " + str(budget) + ")")
+            all_docs.extend(used_docs)
+    elif ratio_groups:
+        print("WARNING: token_ratio specs present but ratio_sum <= 0, skipping them entirely.")
+
+    random.shuffle(all_docs)
+    print("Final mixed document count: " + str(len(all_docs)))
+    return all_docs
+
+
 def analyze_dataset(documents):
     print("\n--- Dataset Analysis ---")
     lengths = [len(d) for d in documents]
@@ -306,50 +447,53 @@ def analyze_dataset(documents):
 def main():
     args = parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
+    random.seed(args.seed)
 
     cleaner = TextCleaner(min_length=args.min_length, max_length=args.max_length)
-    deduper = Deduplicator()
 
-    if args.source == "files":
-        source = FileSource(args.input_dir)
-    elif args.source == "web":
-        source = WebSource(args.urls)
-    elif args.source == "hf":
-        source = HuggingFaceSource(args.dataset, args.dataset_config)
-    elif args.source == "qa":
-        source = QASource(args.input_dir)
-    elif args.source == "africode":
-        source = AfriCodeSource()
+    if args.mix_spec:
+        documents = build_mix(args.mix_spec, cleaner)
+        if not documents:
+            print("ERROR: No documents produced by --mix_spec.")
+            sys.exit(1)
     else:
-        raise ValueError("Unsupported source: " + args.source)
+        deduper = Deduplicator()
 
-    documents = []
-    stats = {"total": 0, "low_quality": 0, "duplicate": 0, "accepted": 0}
+        if args.source == "files":
+            source = FileSource(args.input_dir)
+        elif args.source == "web":
+            source = WebSource(args.urls)
+        elif args.source == "hf":
+            source = HuggingFaceSource(args.dataset, args.dataset_config)
+        elif args.source == "qa":
+            source = QASource(args.input_dir)
+        elif args.source == "africode":
+            source = AfriCodeSource()
+        else:
+            raise ValueError("Unsupported source: " + args.source)
 
-    print("Processing documents...")
-    for raw_doc in source.iter_documents():
-        stats["total"] += 1
-        cleaned = cleaner.process(raw_doc)
+        print("Processing documents...")
+        documents, stats = collect_documents(source, cleaner, deduper)
 
-        if cleaned is None:
-            stats["low_quality"] += 1
-            continue
+        print("Total     : " + str(stats["total"]))
+        print("Rejected  : " + str(stats["low_quality"]))
+        print("Duplicate : " + str(stats["duplicate"]))
+        print("Accepted  : " + str(stats["accepted"]))
 
-        if deduper.is_duplicate(cleaned):
-            stats["duplicate"] += 1
-            continue
+        if not documents:
+            print("ERROR: No documents passed the filter.")
+            sys.exit(1)
 
-        documents.append(cleaned)
-        stats["accepted"] += 1
+        if args.repeat > 1:
+            documents = documents * args.repeat
+            print("Repeated documents x" + str(args.repeat) + " -> " + str(len(documents)) + " total")
 
-    print("Total     : " + str(stats["total"]))
-    print("Rejected  : " + str(stats["low_quality"]))
-    print("Duplicate : " + str(stats["duplicate"]))
-    print("Accepted  : " + str(stats["accepted"]))
-
-    if not documents:
-        print("ERROR: No documents passed the filter.")
-        sys.exit(1)
+        # Shuffle before tokenizing. Without this, documents are concatenated in
+        # their original source order, so a model training on the resulting
+        # stream sees long unbroken topic-contiguous runs -- a real contributor
+        # to memorization and looping in small models. This is the same fix
+        # applied inside build_mix() for the multi-source case.
+        random.shuffle(documents)
 
     if args.analyze:
         analyze_dataset(documents)

@@ -113,7 +113,18 @@ class TransformerLM(nn.Module):
         return logits, loss
 
     @torch.no_grad()
-    def generate(self, idx, max_new_tokens, temperature=0.7, top_k=40):
+    def generate(self, idx, max_new_tokens, temperature=0.7, top_k=40, eos_token_id=None):
+        """
+        Autoregressively generate tokens.
+
+        eos_token_id: if provided, generation stops as soon as this token is
+        produced for EVERY sequence in the batch. This matters more than it
+        looks -- without it, generation always runs the full max_new_tokens
+        regardless of the model emitting a natural end-of-text token, which
+        is why answers can visibly "run on" past a clean stopping point into
+        unrelated content once the intended answer is already complete.
+        """
+        finished = torch.zeros(idx.size(0), dtype=torch.bool, device=idx.device)
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -self.cfg.context_length:]
             logits, _ = self(idx_cond)
@@ -124,6 +135,11 @@ class TransformerLM(nn.Module):
             probs = F.softmax(logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
             idx = torch.cat([idx, next_token], dim=1)
+
+            if eos_token_id is not None:
+                finished = finished | (next_token.squeeze(-1) == eos_token_id)
+                if finished.all():
+                    break
         return idx
 
     def num_parameters(self, trainable_only=True):
